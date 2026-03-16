@@ -18,6 +18,17 @@ app.post('/charge', async (req, res) => {
       return res.status(400).json({ error: 'Missing customer ID' });
     }
 
+    // First fetch the customer's default payment method
+    const customerResponse = await fetch(`https://api.stripe.com/v1/customers/${customer}`, {
+      headers: { 'Authorization': `Bearer ${STRIPE_SECRET_KEY}` }
+    });
+    const customerData = await customerResponse.json();
+    const paymentMethod = customerData.invoice_settings?.default_payment_method;
+
+    if (!paymentMethod) {
+      return res.status(400).json({ error: 'No default payment method found for customer' });
+    }
+
     const stripeResponse = await fetch('https://api.stripe.com/v1/payment_intents', {
       method: 'POST',
       headers: {
@@ -29,6 +40,7 @@ app.post('/charge', async (req, res) => {
         currency,
         customer,
         description,
+        payment_method: paymentMethod,
         'payment_method_types[]': 'card',
         confirm: 'true',
         off_session: 'true'
